@@ -1,0 +1,822 @@
+---
+params:
+  ct_data: ct_data
+  dd_data: dd_data
+  pal: pal
+title: 'qPCR Analysis Report'
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+
+<style type="text/css">
+
+h1.title {
+  font-size: 38px;
+  color: DarkBlue;
+  text-align: center;
+}
+h4.date {
+  font-size: 18px;
+  color: Blue;
+  text-align: center;
+}
+body {
+text-align: justify}
+</style>
+
+
+------------------------------------------------------------------------
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA, results = 'asis')
+```
+
+```{r libraries, include=FALSE}
+if(!require(tabulizer)){
+  devtools::install_github("ropensci/tabulizer")
+  library(tabulizer) # Extract the tables from the pdf file 
+}
+
+if(!require(pdftools)){
+  install.packages("pdftools")
+  library(pdftools) # Extract the text from the pdf file 
+}
+
+if(!require(stringr)){
+  install.packages("stringr")
+  library(stringr) # Recognize patterns
+}
+
+if(!require(openxlsx)){
+  install.packages("openxlsx")
+  library(openxlsx) # Save the results in an excel file
+}
+
+if(!require(dplyr)){
+  install.packages("dplyr")
+  library(dplyr) # Utility
+}
+
+if(!require(ggplot2)){
+  install.packages("ggplot2")
+  library(ggplot2) # Plots
+}
+
+if(!require(ggpubr)){
+  install.packages("ggpubr")
+  library(ggpubr) # Plot statistics
+}
+
+if(!require(ggsignif)){
+  install.packages("ggsignif")
+  library(ggsignif) # Plot statistics
+}
+
+if(!require(readxl)){
+  install.packages("readxl")
+  library(readxl) # Read excel files
+}
+
+if(!require(textshape)){
+  install.packages("textshape")
+  library(textshape) # Read excel files
+}
+
+if(!require(tidyr)){
+  install.packages("tidyr")
+  library(tidyr) # Read excel files
+}
+
+if(!require(tinytex)){
+  install.packages("tinytex")
+  library(tinytex) # Read excel files
+}
+
+if(!require(HTqPCR)){
+  install.packages("HTqPCR")
+  library(HTqPCR) # Read excel files
+}
+
+if(!require(rmarkdown)){
+  install.packages("rmarkdown")
+  library(rmarkdown) # Read excel files
+}
+
+if(!require(ggrepel)){
+  install.packages("ggrepel")
+  library(ggrepel) # Read excel files
+}
+
+if(!require(EnvStats)){
+  install.packages("EnvStats")
+  library(EnvStats) # Read excel files
+}
+
+if(!require(reshape2)){
+  install.packages("reshape2")
+  library(reshape2) # Read excel files
+}
+
+if(!require(purrr)){
+  install.packages("purrr")
+  library(purrr) # Read excel files
+}
+if(!require(knitr)){
+  install.packages("knitr")
+  library(knitr) # Read excel files
+}
+if(!require(kableExtra)){
+  install.packages("kableExtra")
+  library(kableExtra) # Read excel files
+}
+if(!require(ComplexHeatmap)){
+  install.packages("ComplexHeatmap")
+  library(ComplexHeatmap) # Read excel files
+}
+
+```
+
+```{r palettes, include=FALSE}
+################################################################################ 
+#################################   PALETTES   #################################
+################################################################################ 
+
+
+bigspin_colours = list(
+  bigspin1 = c("#A1AAA1", "#66A3E1", "#719DBF", "#7FA7C6","#87A2B7",
+               "#83AFB6", "#8AC3C6", "#9CD3C7", "#7FC6B6","#66E3C8",
+               "#82DCC9", "#91E2D0", "#C2CDC7", "#CDBFB4","#E3C7B1",
+               "#D6B29D", "#E2B491", "#E39C66", "#BF9371","#C68D61"),
+  
+  bigspin2 = c("#A4E366", "#E38366", "#66E37B", "#A09361","#72B87E",
+               "#91B072", "#B08172", "#B0727F", "#6F8E74","#737D6A",
+               "#7D6F6A", "#7D6A6E", "#556357", "#414A37","#4A3C37",
+               "#331C21", "#27392A", "#4A373B", "#27331C","#33211C"),
+  
+  bigspin3 = c("#E3A766", "#9166E3", "#66E37B", "#70C37E","#BF9A71",
+               "#8C71BF", "#72A37A", "#9A8771", "#7F719A","#6C8370",
+               "#766F67", "#6C6776", "#556357", "#51493F","#453F51",
+               "#332719", "#332A20", "#314434", "#314434","#1F3322"),
+  
+  bigspin4 = c("#EDA6C2", "#D66BBB", "#C96FB3", "#BD71AA","#B072A1",
+               "#A37297", "#96718D", "#8A6E83", "#7D6A78","#70656D",
+               "#816D7C", "#745D6E", "#674D61", "#5A3F54","#503449",
+               "#33142B", "#331C2D", "#331F2E", "#33102A","#33172C"),
+  
+  bigspin5 = c("#E37119", "#A39072", "#E3B166", "#A88D65","#E38666",
+               "#E3C066", "#9E9486", "#A37672", "#869672","#A37F72",
+               "#E3D0C1", "#9E8C26", "#E3B694", "#9E8886","#829786",
+               "#A89565", "#A87665", "#A9917E", "#E39C66","#A86965"),
+  
+  bigspin6 = c("", "", "", "","",
+               "", "", "", "","",
+               "", "", "", "","",
+               "", "", "", "","")
+)
+
+bigspin_palettes = function(name, n, all_palettes = bigspin_colours, type = c("discrete", "continuous")) {
+  palette = all_palettes[[name]]
+  if (missing(n)) {
+    n = length(palette)
+  }
+  type = match.arg(type)
+  out = switch(type,
+               continuous = grDevices::colorRampPalette(palette)(n),
+               discrete = palette[1:n]
+  )
+  structure(out, name = name, class = "palette")
+}
+
+```
+
+```{r more_setup, include=FALSE}
+height <- NULL
+
+  df_comb <- bind_rows(ct_data, .id = "Gene")
+  df_comb <- df_comb[-c(2,7,8)]
+  
+  df_mean <- aggregate(CP ~ Group + Gene, df_comb, FUN ="mean")
+  
+   
+if (between(length(unique(df_mean$Gene)), 1, 3)) {
+  height = 4
+} else if (between(length(unique(df_mean$Gene)), 4, 6)) {
+  height = 8
+} else if (between(length(unique(df_mean$Gene)), 7, 9)) {
+  height = 12
+} else {
+  height = 15
+}
+```
+
+<br>
+
+This report was generated using the 'qPCR_report' function from the LAB_qPCR_Data_Analysis repository.
+
+The data follows this structure:
+
+<br>
+
+Genes studied:
+
+```{r infoGenes, echo=FALSE, results='markup'}
+infoGenes <- names(ct_data)
+cat(infoGenes)
+```
+
+<br>
+
+Conditions and Samples:
+
+```{r infoCond, echo=FALSE}
+
+  values <- as.data.frame(Results[[1]])
+  values <- data.frame(values$Name, values$Group)
+  values <- values %>% distinct() 
+  colnames(values) <- c("Sample", "Group")
+  
+  
+kable(values, format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = T,
+                font_size = 16,
+                position = "center")
+```
+
+------------------------------------------------------------------------
+
+<br>
+
+## CT/DDCT values representation
+
+CT and DDCT values are represented using boxplots and violin plots.
+
+Boxplots represent the interquartile range (IQR) between the quartiles 1 (Q1) and 3 (Q3) of each group located in the x axis. Inside each box there is a line that represents the median of the values of that group. The whiskers show the upper and lower extremes using a 1.5\*IQR.
+
+Violin plots represent the distribution of each group using density curves. The frequency of points in areas that are wider will be higher than the narrow ones.
+
+<br>
+
+### CT values {.tabset}
+
+#### CT values for each gene and condition
+
+```{r ct_plot_gene_cond, echo=FALSE, fig.height = height, fig.width = 10, fig.align = "center"}
+  ct_plot_gene_cond <- ggplot(df_comb, aes(x = Gene,
+                                           y = CP, 
+                                           fill= Group)) +
+  geom_violin(aes(x = Group,
+                   y = CP))
+  
+  ct_plot_gene_cond <- facet(ct_plot_gene_cond, facet.by = "Gene", scales = "free") + 
+    geom_point(aes(x = Group,
+                   y = CP),
+               size = .4, position=position_jitter(width = 0.1), show.legend = FALSE) +
+    geom_boxplot(aes(x = Group,
+                     y = CP),
+                 outlier.shape = NA, show.legend = FALSE, width = .08, fill = "white") +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.title = element_blank(),
+          legend.position="top",
+          legend.text = element_text(size=15),
+          legend.key.size = unit(1.5,"line"),
+          axis.title.y = element_text(face="bold"),
+          axis.line = element_line(colour = "black", linewidth = .5),        
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          plot.margin = unit(c(1.2,0.2,1.2,0.2), "cm")) +
+    ylab("CT") +
+    xlab("") +
+    scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                type = "discrete"))
+  
+  print(ct_plot_gene_cond)
+```
+
+#### CT values for each gene
+
+```{r ct_plot_gene, echo=FALSE, fig.height = height, fig.width = 10, fig.align = "center"}
+set.seed(10)
+z_box_all_genes <- ggplot(df_comb, aes(x=Gene, 
+                                       y=CP)) + 
+  geom_boxplot(outlier.colour = "NA") +
+  geom_jitter(size=.25, position = position_jitter(width = .1)) +
+  geom_text_repel(data =. %>% 
+                  group_by(Gene) %>%  
+                  filter(CP %in% boxplot.stats(CP, coef=1.5)$out),
+                  aes(label=Name, y=CP), colour="red", size=3) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_blank(),
+        legend.position="bottom",
+        legend.text = element_text(size=8),
+        legend.key.size = unit(.8,"line"),
+        axis.title.y = element_text(face="bold"),
+        axis.line = element_line(colour = "black", linewidth = .5),
+        axis.text.x = element_text(face="bold", size=10, angle=45, 
+                                   vjust = 0.6, colour="Black"),
+        axis.text.y = element_text(colour = "black", face="bold", size=14),
+        plot.margin = unit(c(1.2,0.2,1.2,0.2), "cm")) +
+  ylab("CT") +
+  xlab("") +
+  scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                              type = "discrete")) +
+  ggtitle("")  
+
+plot(z_box_all_genes)  
+
+
+
+```
+
+#### CT values for each condition {.tabset}
+
+```{r echo = FALSE}
+set.seed(10)  
+
+ct_plot_Group <- ggplot(df_comb, aes(x = Group,
+                                 y = CP,
+                                 fill = Group)) +
+    geom_violin() +
+    geom_point(aes(x = Group,
+                   y = CP),
+               size = .4, position=position_jitter(width = 0.1), show.legend = FALSE) +
+    geom_boxplot(aes(x = Group,
+                     y = CP),
+                 outlier.shape = NA, show.legend = FALSE, width = .08, fill = "white") +
+    theme_bw() +
+    theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.title = element_blank(),
+          legend.position = "none",
+          axis.title.y = element_text(face="bold"),
+          axis.line = element_line(colour = "black", linewidth = .5),
+          axis.text.y = element_text(colour = "black", face="bold", size=14),
+          axis.text.x = element_text(colour = "black", face="bold", size=14)) +
+    ylab("CT") +
+    xlab("") +
+    scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                 type = "discrete"))
+set.seed(10) 
+
+ct_cond_density <- ggplot(df_comb) +
+    geom_density(aes(x = CP, color = Group), show.legend = FALSE, linewidth=1.5) +
+    geom_rug(aes(x = CP, y = 0, color = Group), position = position_jitter(height = 0), show.legend = FALSE) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_blank(),
+        legend.text = element_blank(),
+        legend.key.size = unit(.8,"line"),
+        axis.title.y = element_text(face="bold"),
+        axis.line = element_line(colour = "black", linewidth = .5),
+        axis.text.x = element_text(face="bold", size=14, colour="Black"),
+        axis.text.y = element_text(colour = "black", face="bold", size=14),
+        plot.margin = unit(c(1.2,0.2,1.2,0.2), "cm")) +
+  ylab("Frequency") +
+  xlab("CT") +
+  scale_color_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                              type = "discrete")) +
+  ggtitle("")  
+
+cat("\n")
+```
+
+```{r echo=FALSE, fig.height = (height-0.5), fig.width = 10, fig.align = "center", results='asis'}
+cat("##### Violin Plot \n")
+plot(ct_plot_Group)
+```
+
+```{r echo=FALSE, fig.height = (height-0.5), fig.width = 10, fig.align = "center", results='asis'}
+cat("##### Frequency Plot \n")
+plot(ct_cond_density)
+```
+
+### DDCT values for each gene
+
+```{r setup_dd, include =FALSE}
+ dd_comb <- bind_rows(dd_data, .id = "Gene")
+  
+  dd_mean <- aggregate(ddct ~ Name + Gene, dd_comb, FUN ="mean")
+
+```
+
+```{r dd_plot, echo=FALSE, fig.height = 10, fig.width = 16, fig.align = "center"}
+set.seed(10)
+dd_plot<- ggplot(dd_comb, aes(x = Gene,
+                                 y = ddct,
+                                 fill = Name))
+
+if (sum(is.na(dd_comb$sd)) == 0) {
+cat("Mean and standard deviation were calculated for every sample and gene (due to lack of\nreplicates). Therefore, a barplot is displayed. Each bar represents the mean of ddct\n(2^-(ddct)) values. The lines show the sd of each mean.")
+  
+  dd_plot <- dd_plot + geom_bar(data = dd_comb, aes(x = Gene,
+                                 y = ddct),
+             stat="identity", position = position_dodge(.9), 
+             width = .9, colour="black") +
+    
+    geom_errorbar(aes(ymin = ddct - sd, ymax = ddct + sd), 
+                  position = position_dodge(.9), width = .2)+
+    
+    geom_point(data = dd_comb, aes(x = Gene,
+                                   y = ddct), size = .5, position = position_dodge(.9), show.legend=FALSE) +
+    theme_bw() +
+    scale_y_continuous(expand = expansion(mult = c(0, .2))) +
+    theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.title = element_blank(),
+          legend.position="bottom",
+          legend.text = element_text(size=14),
+          legend.key.size = unit(1,"line"),
+          axis.title.y = element_text(face="bold"),
+          axis.line = element_line(colour = "black", linewidth = .5),
+          axis.text.x = element_text(face="bold", size=16, angle=45, 
+                                     vjust = 0.6, colour="Black"),
+          axis.text.y = element_text(colour = "black", face="bold", size=14)) +
+    ylab("DDCT") +
+    xlab("") +
+    scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                type = "discrete"))
+} else {
+  cat("Mean and standard deviation were not calculated for at least one sample and gene. \n 
+      Therefore, ddct values are displayed with dots. \n")
+  
+  dd_plot <- dd_plot + geom_point(data = dd_comb, aes(x = Name,
+                                   y = ddct), size = 3, position = position_dodge(.9), show.legend=FALSE)
+  
+  dd_plot <- facet(dd_plot, facet.by = "Gene", scales = "free") +
+    theme_bw() +
+    scale_y_continuous(expand = expansion(mult = c(0, .2))) +
+    theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "20"),
+          panel.border = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          legend.title = element_blank(),
+          legend.position="bottom",
+          legend.text = element_text(size=14),
+          legend.key.size = unit(1,"line"),
+          axis.title.y = element_text(face="bold"),
+          axis.line = element_line(colour = "black", linewidth = .5),
+          axis.text.x = element_text(face="bold", size=16, angle=45, 
+                                     vjust = 0.6, colour="Black"),
+          axis.text.y = element_text(colour = "black", face="bold", size=14)) +
+    ylab("DDCT") +
+    xlab("") +
+    scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                type = "discrete"))
+  
+}
+    
+  
+  print(dd_plot)
+```
+
+------------------------------------------------------------------------
+
+<br>
+
+## Sample Analysis
+
+### Principal Component Analysis {.tabset}
+
+A principal component analysis was performed to the CT and DDCT data separately to reduce the dimensionality of both results. The next two plots consist in the two first components of the PCAs:
+
+#### PCA - CT Values
+
+```{r PCA_CT, echo=FALSE, warning=FALSE, fig.align = "center"}
+  mat1 <- lapply(Results, function(x) {
+    a <- data.frame(x$Name, x$CP)
+    return(a)
+  })
+  
+  ans <- map_df(mat1, ~as.data.frame(.x), .id="Gene")
+  colnames(ans) <- c("Gene", "Name", "CP")
+    
+  data1 <- aggregate(CP ~ Name + Gene, ans, FUN = "mean")
+  
+  data1 <- spread(data1, Gene, CP)
+  
+  rownames(data1) <- data1$Name
+  
+  data_matrix1 <- data1[-c(1)]
+  
+  # Manual PCA computation with prcomp
+  mat1 <- data_matrix1
+  
+  # Remove the zero-variance columns: otherwise we cannot scale the data (optional)
+  mat1 <- mat1[which(apply(mat1, 1, var) != 0),]
+  
+  pca = prcomp(mat1, scale=TRUE, center=TRUE)
+  PCs <- as.data.frame(pca$x)
+  PCs$Sample <- rownames(PCs)
+  
+  PCs[["Group"]] <-  values$Group[match(PCs$Sample, values$Sample)]
+  
+  Variance <- round(summary(pca)$importance[2,]*100, digits=1)
+  
+  CompletePC <- PCs
+  
+  colnames(PCs)[colnames(PCs) == "PC1"] <- 'ComponentX'
+  colnames(PCs)[colnames(PCs) == "PC2"] <- 'ComponentY'
+  
+  firstcomp <- 1
+  secondcomp <- 2
+  
+  plot1 <- ggplot(PCs, aes(ComponentX, 
+                               ComponentY,
+                               color=PCs$Group, 
+                               label=Sample))
+  
+  plot1 <- plot1 +
+    geom_point(color="black",size=5,alpha=0.4) +
+    geom_point(size=4,alpha=0.8) +
+    scale_color_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                  type = "discrete")) +
+    geom_text_repel(size=3, color="black") +
+    xlab(paste0("PC1", ": ", Variance[firstcomp], "% variance")) +
+    ylab(paste0("PC2", ": ", Variance[secondcomp], "% variance")) +
+    labs(color = "Condition")+
+    theme_bw()+
+    theme(legend.title = element_text(size = 12,face="italic"),
+          legend.text = element_text(size = 12),
+          panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank(),
+          axis.title=element_text(size=14,face="bold"),
+          axis.text.x = element_text(size=14, hjust = 1),
+          axis.text.y = element_text(size=14, hjust = 1))
+  
+  xlim_vector = c(1.2*min(PCs$ComponentX), 1.2*max(PCs$ComponentX))
+  
+  ylim_vector = c(1.2*min(PCs$ComponentY), 1.2*max(PCs$ComponentY))
+  
+  plot1 <- plot1 +
+    xlim(xlim_vector) +
+    ylim(ylim_vector)
+  
+  print(plot1)
+
+```
+
+#### PCA - DDCT Values
+
+```{r PCA_ddct, echo=FALSE, warning=FALSE, fig.align = "center"}
+  data <- spread(dd_mean, Gene, ddct)
+  
+  rownames(data) <- data$Name
+  
+  data_matrix <- data[-c(1)]
+
+  # Manual PCA computation with prcomp
+  mat <- data_matrix
+  
+  pca = prcomp(mat, scale=TRUE, center=TRUE)
+  PCs <- as.data.frame(pca$x)
+  PCs$Sample <- rownames(PCs)
+
+  PCs[["Group"]] <-  values$Group[match(PCs$Sample, values$Sample)]
+  
+  Variance <- round(summary(pca)$importance[2,]*100, digits=1)
+
+  colnames(PCs)[colnames(PCs) == "PC1"] <- 'ComponentX'
+  colnames(PCs)[colnames(PCs) == "PC2"] <- 'ComponentY'
+  
+ 
+  plot2 <- ggplot(PCs, aes(ComponentX, 
+                               ComponentY,
+                               color=PCs$Group, 
+                               label=Sample))
+  
+  plot2 <- plot2 +
+    geom_point(color="black",size=5,alpha=0.4) +
+    geom_point(size=4,alpha=0.8) +
+    scale_color_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                                  type = "discrete")) +
+    geom_text_repel(size=3, color="black") +
+    xlab(paste0("PC1", ": ", Variance[firstcomp], "% variance")) +
+    ylab(paste0("PC2", ": ", Variance[secondcomp], "% variance")) +
+    labs(color = "Condition")+
+    theme_bw()+
+    theme(legend.title = element_text(size = 12,face="italic"),
+          legend.text = element_text(size = 12),
+          panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank(),
+          axis.title=element_text(size=14,face="bold"),
+          axis.text.x = element_text(size=14, hjust = 1),
+          axis.text.y = element_text(size=14, hjust = 1))
+  
+  xlim_vector2 = c(1.2*min(PCs$ComponentX), 1.2*max(PCs$ComponentX))
+  
+  ylim_vector2 = c(1.2*min(PCs$ComponentY), 1.2*max(PCs$ComponentY))
+  
+  plot2 <- plot2 +
+    xlim(xlim_vector2) +
+    ylim(ylim_vector2)
+  
+  print(plot2)
+
+```
+
+### Heatmap
+
+The colors of the heatmap represent the expression of each gene in each sample (Blue = Low Expression, Red = High Expression). The hierarchical clustering used to order both samples and genes utilizes the pearson correlation coefficient and uses a complete method to find similar groups.
+
+```{r hc, echo=FALSE, fig.align = "center"}
+mat.scaled <- apply(mat1, 2, scale)
+
+mat.scaled2 <- t(mat.scaled)
+
+colnames(mat.scaled2) <- rownames(mat1)
+
+mat2 <- mat1 
+
+mat2[["Group"]] <-  values$Group[match(rownames(mat2), values$Sample)]
+
+ha = HeatmapAnnotation(df=data.frame(Group = as.character(mat2$Group)),
+                       show_annotation_name = FALSE)
+
+ht1 = Heatmap(mat.scaled2,
+              name = "Scaled CP",
+              column_title = "All Samples",
+              column_title_gp = gpar(fontsize = 10),
+              cluster_columns = TRUE,
+              clustering_distance_columns = "pearson",
+              clustering_method_columns = "complete",
+              show_column_dend = TRUE,
+              top_annotation = ha,
+              row_title_gp = gpar(fontsize=7),
+              show_heatmap_legend = TRUE,
+              show_column_names = TRUE,
+              show_row_names = TRUE,
+              clustering_distance_rows = "pearson",
+              clustering_method_rows = "complete",
+              show_row_dend = TRUE,
+             # row_split = 15,  # If we want to cut by cluster
+              column_names_gp = gpar(fontsize=9),
+              width = unit(8, "cm"))
+             
+
+plot(ht1)
+```
+
+### Hierarchical clustering
+
+The hierarchical clustering shown below uses the euclidean distance to compare the samples by similarity, using the complete method.
+
+```{r hclust, echo=FALSE, fig.align = "center"}
+d <- dist(as.matrix(mat1), method = "euclidean")
+
+set.seed("1")
+h <- hclust(d, method = "complete", members = NULL)
+
+plot(h, labels = NULL, hang = 0.1, check = TRUE,
+     axes = TRUE, frame.plot = FALSE, ann = TRUE,
+     main = "Cluster Dendrogram",
+     sub = NULL, xlab = "Samples")
+
+```
+
+------------------------------------------------------------------------
+
+<br>
+
+## Extreme Values Detection
+
+To detect extreme values, z-scores were calculated for the values of each gene. These z-values are plotted below using boxplots. Each box represents the interquartile range (IQR) between the quartiles 1 (Q1) and 3 (Q3).
+
+Inside each box there is a line that represents the median of the values of that gene.
+
+The whiskers show the upper and lower extremes using a 1.5\*IQR.
+
+```{r extr_values, echo=FALSE, fig.height = 8, fig.width = 8, fig.align = "center"}
+means <- as.data.frame(aggregate(df_comb$CP, list(df_comb$Gene), FUN = "mean"))
+colnames(means) <- c("Gene","Mean_CP")
+
+sd <- as.data.frame(aggregate(df_comb$CP, list(df_comb$Gene), FUN = "sd"))
+colnames(sd) <- c("Gene","sd_CP")
+
+mean_sd <- merge(means,sd,by="Gene")
+
+df_comb <- merge(df_comb,mean_sd,by="Gene")
+
+z_scores <- (df_comb$CP - df_comb$Mean_CP)/df_comb$sd_CP
+
+df_comb <- cbind(df_comb, z_scores)
+
+df_comb$z_score_std <- scale(df_comb$CP) 
+
+### All Genes combined
+all_genes_mean <- mean(df_comb$CP)
+
+all_genes_sd <- sd(df_comb$CP)
+
+df_comb <- cbind(df_comb,all_genes_mean,all_genes_sd)
+
+all_genes_z_scores <- (df_comb$CP - df_comb$all_genes_mean)/df_comb$all_genes_sd
+
+df_comb <- cbind(df_comb, all_genes_z_scores)
+
+
+set.seed(10)
+z_box <- ggplot(df_comb, aes(x=Gene, 
+                             y=z_scores)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(size=.25, position = position_jitter(width = .15)) +
+  geom_text_repel(data =. %>% 
+                  group_by(Gene) %>%  
+                  filter(z_scores %in% boxplot.stats(z_scores, coef=1.5)$out),
+                  aes(label=Name, y=z_scores), colour="red", size=3) +    
+  theme_bw() +
+  theme(plot.title = element_text(hjust = .5, vjust = 0.6, face = "bold", size = "18"),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_blank(),
+        legend.position="bottom",
+        legend.text = element_text(size=8),
+        legend.key.size = unit(.8,"line"),
+        axis.title.y = element_text(face="bold"),
+        axis.line = element_line(colour = "black", linewidth = .5),
+        axis.text.x = element_text(face="bold", size=10, angle=45, 
+                                   vjust = 0.6, colour="Black"),
+        axis.text.y = element_text(colour = "black", face="bold", size=14),
+        plot.margin = unit(c(1.2,0.2,1.2,0.2), "cm")) +
+  ylab("Z-score") +
+  xlab("") +
+  scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
+                                              type = "discrete")) +
+  ggtitle("Z-scores (Mean for each gene)")
+plot(z_box)
+```
+
+### Rosner Test
+
+Extreme values were detected using the Rosner Test.
+
+Rosner, B. (1975). On the Detection of Many Outliers. Technometrics, 17(2), 221–227. <https://doi.org/10.2307/1268354>.
+
+More information available in: <https://search.r-project.org/CRAN/refmans/EnvStats/html/rosnerTest.html>
+
+```{r rosner, echo=FALSE}
+rosner <- rosnerTest(df_comb$z_scores, k = 10)
+
+rosner_values <- rosner$all.stats
+
+kable(rosner_values, format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = T,
+                font_size = 14,
+                position = "center")
+
+obs_num <- rosner_values$Obs.Num
+obs_num_TRUE <- which(rosner_values$Outlier == TRUE)
+outliers <- rosner_values[obs_num_TRUE,]
+out_num <- outliers$Obs.Num
+
+
+```
+
+<br>
+
+```{r extreme_values rosner, echo=FALSE}
+if (length(out_num) > 0) {
+  
+cat("The Rosner Test identified at least one outlier:\n")
+
+rosner_comb <- df_comb[-c(6,7,9,10,11,12)]
+kable(rosner_comb[out_num,], format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = T,
+                font_size = 14,
+                position = "center")
+
+} else {
+
+cat("The Rosner Test did not identify any outlier. The table below shows the most extreme values from the data:\n")
+  
+rosner_comb <- df_comb[-c(6,7,9,10,11,12)]
+kable(rosner_comb[obs_num,], format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"),
+                full_width = T,
+                font_size = 14,
+                position = "center")
+}
+
+```
