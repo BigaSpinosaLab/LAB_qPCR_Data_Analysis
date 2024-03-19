@@ -178,7 +178,7 @@ after closing and opening RStudio even if the session was not closed, to ensure 
 the latest version of the script. 
 
 ```{r}
-source("/home/user/Documents/Files/Projects/LAB_qPCR_Data_Analysis/R/Misc_qPCR_Analysis.R")
+source("https://raw.githubusercontent.com/BigaSpinosaLab/LAB_qPCR_Data_Analysis/main/R/Misc_qPCR_Analysis.R")
 ```
 
 ### 3. Execution
@@ -240,7 +240,7 @@ test to find posible outliers within the data.
 ```{r}
 qPCR_report(ct_data = Results,
             dd_data = ddct_results,
-            pal = 1, # Number from 1 to 5
+            pal = 1, # Number from 1 to 5 (color palette)
             output_dir = paste0(result_path),
             output_file = paste0(exp_name, "_qPCR_Analysis_Report"))
 ```
