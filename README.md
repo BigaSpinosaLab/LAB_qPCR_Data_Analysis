@@ -2,6 +2,12 @@
 
 [![Lifecycle: experimental](https://lifecycle.r-lib.org/articles/figures/lifecycle-experimental.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 
+## What's New in Version 2.0 🚀
+* **Dependency Cleanup:** Removed `tabulizer` (deprecated) to ensure long-term stability and easier installation.
+* **Code Refactoring:** Standardized variable naming conventions for better readability.
+    * Improved internal documentation and comments throughout the scripts.
+* **UI & Reporting:** Refined the visual output of the analysis results.
+
 ## Overview
 
 The LAB_qPCR_Data_Analysis repository aims to help you automatize the following processes:
@@ -84,16 +90,6 @@ pdf_path = "/home/user/Documents/Files/Projects/LAB_qPCR_Data_Analysis/Demo_File
 ```
 This parameter will tell the `Read_PDF()` function the path where the pdf file is stored. Notice 
 the last thing in the parameter must be a ".pdf"
-
-#### wells
-```{r}
-wells = 27
-```
-This parameter has to be filled with the number of rows that each table contains (it has to be the same
-number for all the tables).
-
-If you have already read this pdf and want to use the resulting excel as the input, you must fill this 
-parameter instead:
 
 #### Excel_path
 ```{r}
