@@ -37,107 +37,21 @@ knitr::opts_chunk$set(echo = TRUE, comment = NA, results = 'asis')
 ```
 
 ```{r libraries, include=FALSE}
-if(!require(tabulizer)){
-  devtools::install_github("ropensci/tabulizer")
-  library(tabulizer) # Extract the tables from the pdf file 
+
+# Lista de paquetes necesarios
+packages <- c("pdftools", "stringr", "openxlsx", "dplyr", "ggplot2", "ggpubr", 
+              "ggsignif", "readxl", "textshape", "tidyr", "tinytex", 
+              "rmarkdown", "ggrepel", "EnvStats", "reshape2", "purrr", "knitr", 
+              "kableExtra", "ComplexHeatmap")
+
+# Instalación y carga silenciosa
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
 }
 
-if(!require(pdftools)){
-  install.packages("pdftools")
-  library(pdftools) # Extract the text from the pdf file 
-}
-
-if(!require(stringr)){
-  install.packages("stringr")
-  library(stringr) # Recognize patterns
-}
-
-if(!require(openxlsx)){
-  install.packages("openxlsx")
-  library(openxlsx) # Save the results in an excel file
-}
-
-if(!require(dplyr)){
-  install.packages("dplyr")
-  library(dplyr) # Utility
-}
-
-if(!require(ggplot2)){
-  install.packages("ggplot2")
-  library(ggplot2) # Plots
-}
-
-if(!require(ggpubr)){
-  install.packages("ggpubr")
-  library(ggpubr) # Plot statistics
-}
-
-if(!require(ggsignif)){
-  install.packages("ggsignif")
-  library(ggsignif) # Plot statistics
-}
-
-if(!require(readxl)){
-  install.packages("readxl")
-  library(readxl) # Read excel files
-}
-
-if(!require(textshape)){
-  install.packages("textshape")
-  library(textshape) # Read excel files
-}
-
-if(!require(tidyr)){
-  install.packages("tidyr")
-  library(tidyr) # Read excel files
-}
-
-if(!require(tinytex)){
-  install.packages("tinytex")
-  library(tinytex) # Read excel files
-}
-
-if(!require(HTqPCR)){
-  install.packages("HTqPCR")
-  library(HTqPCR) # Read excel files
-}
-
-if(!require(rmarkdown)){
-  install.packages("rmarkdown")
-  library(rmarkdown) # Read excel files
-}
-
-if(!require(ggrepel)){
-  install.packages("ggrepel")
-  library(ggrepel) # Read excel files
-}
-
-if(!require(EnvStats)){
-  install.packages("EnvStats")
-  library(EnvStats) # Read excel files
-}
-
-if(!require(reshape2)){
-  install.packages("reshape2")
-  library(reshape2) # Read excel files
-}
-
-if(!require(purrr)){
-  install.packages("purrr")
-  library(purrr) # Read excel files
-}
-if(!require(knitr)){
-  install.packages("knitr")
-  library(knitr) # Read excel files
-}
-if(!require(kableExtra)){
-  install.packages("kableExtra")
-  library(kableExtra) # Read excel files
-}
-if(!require(ComplexHeatmap)){
-  install.packages("ComplexHeatmap")
-  library(ComplexHeatmap) # Read excel files
-}
+# Carga de librerías
+invisible(lapply(packages, library, character.only = TRUE))
 
 ```
 
@@ -197,21 +111,25 @@ bigspin_palettes = function(name, n, all_palettes = bigspin_colours, type = c("d
 ```{r more_setup, include=FALSE}
 height <- NULL
 
-  df_comb <- bind_rows(ct_data, .id = "Gene")
-  df_comb <- df_comb[-c(2,7,8)]
+ct_data <- params$ct_data
+dd_data <- params$dd_data
+pal <- params$pal
+
+df_comb <- bind_rows(ct_data, .id = "Gene")
+df_comb <- df_comb[-c(2,7,8)]
   
-  df_mean <- aggregate(CP ~ Group + Gene, df_comb, FUN ="mean")
+df_mean <- aggregate(CP ~ Group + Gene, df_comb, FUN ="mean")
   
    
-if (between(length(unique(df_mean$Gene)), 1, 3)) {
-  height = 4
-} else if (between(length(unique(df_mean$Gene)), 4, 6)) {
-  height = 8
-} else if (between(length(unique(df_mean$Gene)), 7, 9)) {
-  height = 12
-} else {
-  height = 15
-}
+n_genes <- length(unique(df_mean$Gene))
+
+height <- case_when(
+  n_genes <= 3 ~ 4,
+  n_genes <= 6 ~ 8,
+  n_genes <= 9 ~ 12,
+  TRUE ~ 15
+)
+
 ```
 
 <br>
@@ -225,8 +143,7 @@ The data follows this structure:
 Genes studied:
 
 ```{r infoGenes, echo=FALSE, results='markup'}
-infoGenes <- names(ct_data)
-cat(infoGenes)
+cat(names(params$ct_data), sep = ", ")
 ```
 
 <br>
@@ -235,7 +152,7 @@ Conditions and Samples:
 
 ```{r infoCond, echo=FALSE}
 
-  values <- as.data.frame(Results[[1]])
+  values <- as.data.frame(ct_data[[1]])
   values <- data.frame(values$Name, values$Group)
   values <- values %>% distinct() 
   colnames(values) <- c("Sample", "Group")
@@ -299,7 +216,7 @@ Violin plots represent the distribution of each group using density curves. The 
     scale_fill_manual(values = bigspin_palettes(paste0("bigspin", pal),
                                                 type = "discrete"))
   
-  print(ct_plot_gene_cond)
+  plot(ct_plot_gene_cond)
 ```
 
 #### CT values for each gene
@@ -486,7 +403,7 @@ cat("Mean and standard deviation were calculated for every sample and gene (due 
 }
     
   
-  print(dd_plot)
+  plot(dd_plot)
 ```
 
 ------------------------------------------------------------------------
@@ -502,7 +419,7 @@ A principal component analysis was performed to the CT and DDCT data separately 
 #### PCA - CT Values
 
 ```{r PCA_CT, echo=FALSE, warning=FALSE, fig.align = "center"}
-  mat1 <- lapply(Results, function(x) {
+  mat1 <- lapply(ct_data, function(x) {
     a <- data.frame(x$Name, x$CP)
     return(a)
   })
@@ -571,7 +488,7 @@ A principal component analysis was performed to the CT and DDCT data separately 
     xlim(xlim_vector) +
     ylim(ylim_vector)
   
-  print(plot1)
+  plot(plot1)
 
 ```
 
@@ -630,7 +547,7 @@ A principal component analysis was performed to the CT and DDCT data separately 
     xlim(xlim_vector2) +
     ylim(ylim_vector2)
   
-  print(plot2)
+  plot(plot2)
 
 ```
 
